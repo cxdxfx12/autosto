@@ -21,7 +21,7 @@
 ```
 android/
   settings.gradle / build.gradle / gradle.properties
-  gradle/wrapper/gradle-wrapper.properties   # 缺少 wrapper.jar，Android Studio 会自动补齐
+  gradle/wrapper/gradle-wrapper.properties   # 仅 wrapper 配置；CI 用 gradle-build-action 指定 Gradle 8.4，无需 wrapper.jar
   app/
     build.gradle
     proguard-rules.pro
@@ -39,6 +39,22 @@ android/
 
 ## 构建（生成 APK）
 
+两种方法，任选其一：
+
+### 方法一：一键云端构建（推荐，不用装任何东西）
+
+仓库已配好 GitHub Actions（`.github/workflows/build-apk.yml`），云端 Ubuntu runner 自带 JDK 17，自动装 Android SDK（android-33）+ Gradle 8.4，构建出 debug APK 并作为 Artifact 提供下载。
+
+1. 打开 `https://github.com/cxdxfx12/autosto/actions/workflows/build-apk.yml`
+2. 点 **Run workflow** → 选 `main` 分支 → Run。
+3. 等 3~6 分钟，构建完成后到 **Artifacts** 区下载 `sto-collector-app-debug`（里面是 `app-debug.apk`）。
+4. 把 APK 拷到手机安装。
+
+> 每次 `android/**` 有改动 push 到 main 也会自动触发一次构建（方便拿到最新包）。
+> 该 APK 是 **debug 签名**，真机可直接装（允许「未知来源」）。若要正式分发/上架，再配 release 签名。
+
+### 方法二：本地 Android Studio
+
 需要：**Android Studio**（自带 SDK/AGP/JDK）、**申行者**已装在手机上、手机与电脑同一局域网。
 
 1. 用 Android Studio 打开本 `android/` 目录（File → Open）。首次会下载 AGP 8.1.4 / Gradle 8.4（需联网一次）。
@@ -48,7 +64,6 @@ android/
 5. 把 APK 拷到手机安装。
 
 > 命令行：`gradle wrapper` 生成 wrapper.jar 后 `./gradlew assembleDebug`。
-> 本机（开发机）当前**没有 JDK/Android SDK**，所以这个 APK 是在源码层面交付的，构建需在你自己的 Android Studio 里完成。
 
 ## 使用步骤
 
@@ -87,7 +102,7 @@ android/
 
 - **设备校准**：`StoAccessibilityService` 里的节点定位（输入框 className、`^确定$`、`^完成$`、`tvUpload`、`粘贴`、弹窗词）是按 PC 端逻辑移植的，不同申行者版本/机型可能需要微调。安装后若揽收不动，先用 AutoX 的 `probe.js` 思路 dump 控件树核对，或直接 logcat 看 `StoCollector` 标签的日志。
 - **AccessibilityNodeInfo 回收**：为简化，部分搜索路径未严格回收中间节点，长期运行有轻微泄漏风险；正式上线前建议按 Android 规范补 `recycle()`。
-- **本机未编译**：源码未经编译验证（开发机无 JDK/SDK），首次构建若报小错，多半是 SDK 版本/依赖下载问题，按 Android Studio 提示处理即可。
+- **编译验证**：源码已通过 GitHub Actions 云端构建验证（见上文「方法一：一键云端构建」）；若你在本地构建报小错，多半是 SDK 版本/依赖下载问题，按 Android Studio 提示处理即可。
 
 ## 故障排查
 
