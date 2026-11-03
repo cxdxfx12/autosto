@@ -1,0 +1,35 @@
+#pragma code_page(65001)  // 源码是 UTF-8，别按 GBK 解析中文
+#include <windows.h>
+#include "resource.h"
+
+IDI_APPICON ICON "app.ico"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,1
+ PRODUCTVERSION 1,0,0,1
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404b0"
+        BEGIN
+            VALUE "CompanyName",      "杭州喵喵至家网络有限公司"
+            VALUE "FileDescription",  "运单自动采集自动揽收助手"
+            VALUE "FileVersion",      "1.0.0.1"
+            VALUE "InternalName",     "miao-scan-shell"
+            VALUE "LegalCopyright",   "Copyright (C) 2026 杭州喵喵至家网络有限公司"
+            VALUE "OriginalFilename", "运单自动采集自动揽收助手.exe"
+            VALUE "ProductName",      "运单自动采集自动揽收助手"
+            VALUE "ProductVersion",   "1.0.0.1"
+            VALUE "Comments",         "www.hbdxm.com 专注行业软件开发"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x804, 1200
+    END
+END

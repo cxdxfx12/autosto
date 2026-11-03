@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<title>取单 · 运单揽件助手</title>
+<style>
+  :root{
+    --bg:#f3f4f7; --panel:#fff; --line:#e8eaf0; --text:#191d27;
+    --muted:#7a8194; --brand:#f0742c; --brand-deep:#e05f1a; --brand-soft:#fff3ea;
+    --green:#17924c; --green-soft:#e9f8ef; --red:#d3382f; --red-soft:#fdeeed;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    margin:0;padding:18px 16px calc(28px + env(safe-area-inset-bottom));
+    background:var(--bg);color:var(--text);
+    font:16px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px}
+  h1{font-size:19px;margin:0 0 4px;font-weight:650}
+  .sub{color:var(--muted);font-size:14px}
+  .count{font-size:40px;font-weight:700;line-height:1.1;color:var(--brand);margin:6px 0 2px}
+  .count small{font-size:16px;font-weight:500;color:var(--muted);margin-left:6px}
+  #copy{
+    width:100%;border:0;border-radius:14px;padding:19px 16px;margin-top:14px;
+    background:var(--brand);color:#fff;font-size:19px;font-weight:650;
+    box-shadow:0 6px 16px rgba(240,116,44,.28);transition:.15s;
+  }
+  #copy:active{transform:scale(.985);background:var(--brand-deep)}
+  #copy.ok{background:var(--green);box-shadow:0 6px 16px rgba(23,146,76,.24)}
+  #copy:disabled{opacity:.6}
+  .steps{margin:0;padding:0;list-style:none;counter-reset:s}
+  .steps li{position:relative;padding:0 0 14px 34px;counter-increment:s;color:var(--text);font-size:15px}
+  .steps li:last-child{padding-bottom:0}
+  .steps li::before{
+    content:counter(s);position:absolute;left:0;top:1px;
+    width:23px;height:23px;border-radius:50%;background:var(--brand-soft);color:var(--brand);
+    font-size:13px;font-weight:650;display:flex;align-items:center;justify-content:center;
+  }
+  .steps b{font-weight:650}
+  .warn{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--brand-soft);
+        color:#8a4a15;font-size:13.5px;line-height:1.5}
+  #err{padding:16px;border-radius:12px;background:var(--red-soft);color:var(--red);font-size:15px;display:none}
+  #manual{display:none;margin-top:12px}
+  #manual textarea{
+    width:100%;height:150px;border:1px solid var(--line);border-radius:10px;padding:10px;
+    font:13px/1.5 ui-monospace,Menlo,monospace;color:var(--muted);resize:vertical;
+    background:#fafbfc;-webkit-user-select:all;user-select:all;
+  }
+  .foot{text-align:center;color:#a2a8ba;font-size:12px;margin-top:18px;line-height:1.6}
+  .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:6px;vertical-align:1px}
+</style>
+</head>
+<body>
+
+<div class="card" id="main" style="display:none">
+  <h1>本批待揽收</h1>
+  <div class="count"><span id="num">0</span><small>个单号</small></div>
+  <div class="sub" id="batchLine"></div>
+  <button id="copy" onclick="doCopy()">复制全部单号</button>
+  <div id="manual">
+    <div class="sub" style="margin:10px 0 6px">自动复制被浏览器拦了，请长按下面的框全选复制：</div>
+    <textarea id="raw" readonly></textarea>
+  </div>
+</div>
+
+<div class="card" id="guide" style="display:none">
+  <h1 style="font-size:15px;color:var(--muted);font-weight:600;margin-bottom:12px">复制之后</h1>
+  <ol class="steps">
+    <li>打开申行者，进 <b>揽件扫描</b></li>
+    <li>长按输入框 → <b>粘贴</b>（会自己按逗号分行）</li>
+    <li>点右上角 <b>确定</b>，等它跑完</li>
+  </ol>
+  <div class="warn">别勾左边的「扫描枪输入」—— 那是给巴枪用的，勾了就不吃粘贴的文本。</div>
+</div>
+
+<div id="err"></div>
+
+<div class="foot">
+  <span class="dot"></span>杭州喵喵至家网络有限公司<br>
+  链接 15 分钟内有效，过期在电脑上重新点「发到手机」
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var TICKET = location.pathname.replace(/^\/m\//, "").split("?")[0];
+  var DATA = null;
+
+  function showError(msg){
+    var e = document.getElementById("err");
+    e.textContent = msg;
+    e.style.display = "block";
+  }
+
+  function paint(d){
+    DATA = d;
+    document.getElementById("num").textContent = d.count;
+    document.getElementById("batchLine").textContent = "批次 " + d.batch_id;
+    document.getElementById("main").style.display = "block";
+    document.getElementById("guide").style.display = "block";
+    document.getElementById("raw").value = d.text;
+  }
+
+  function legacyCopy(text){
+    // iOS Safari 在 http（非安全上下文）下没有 navigator.clipboard，
+    // 只能靠 textarea + select + execCommand，且必须在用户点击的调用栈里执行。
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { ta.setSelectionRange(0, text.length); } catch(e) {}
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch(e) {}
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  function markedOk(){
+    var b = document.getElementById("copy");
+    b.textContent = "✓ 已复制，去申行者粘贴";
+    b.classList.add("ok");
+  }
+
+  function doCopy(){
+    if (!DATA) return;
+    var btn = document.getElementById("copy");
+    btn.disabled = true;
+    var done = false;
+
+    function finish(ok){
+      btn.disabled = false;
+      if (ok){ markedOk(); return; }
+      // 自动复制失败：把原文摊开让人手动全选
+      document.getElementById("manual").style.display = "block";
+      btn.textContent = "再试一次";
+      var raw = document.getElementById("raw");
+      raw.focus(); raw.select();
+    }
+
+    if (navigator.clipboard && window.isSecureContext && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(DATA.text).then(function(){ finish(true); }, function(){ finish(legacyCopy(DATA.text)); });
+      return;
+    }
+    // 给 execCommand 一点时间在用户手势上下文里执行
+    setTimeout(function(){ finish(legacyCopy(DATA.text)); }, 0);
+  }
+  window.doCopy = doCopy;
+
+  fetch("/api/mobile/text?t=" + encodeURIComponent(TICKET), {cache:"no-store"})
+    .then(function(r){
+      if (!r.ok) return r.json().then(function(j){
+        throw new Error((j.error && j.error.message) || ("HTTP " + r.status));
+      });
+      return r.json();
+    })
+    .then(paint)
+    .catch(function(e){ showError(e.message || "打不开，请让电脑重新生成二维码"); });
+
+  // 页面回到前台时刷新一次：电脑那边可能又入库了新单
+  document.addEventListener("visibilitychange", function(){
+    if (document.visibilityState !== "visible" || !DATA) return;
+    fetch("/api/mobile/text?t=" + encodeURIComponent(TICKET), {cache:"no-store"})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){ if (d && d.count !== DATA.count) paint(d); })
+      .catch(function(){});
+  });
+})();
+</script>
+</body>
+</html>

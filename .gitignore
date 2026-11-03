@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 构建产物
+build/
+dist/
+*.spec
+
+# 运行数据（绝不入库：含日志、数据库、下载的图片）
+data/
+*.log
+
+# 本地配置（含 token / 账号）
+config.yaml
+env.json
+*.local.yaml
+
+# 手机端
+android/build/
+android/dist/
+*.apk
+*.keystore
+
+# 编辑器 / 系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 第三方大二进制（CEF / webview2 / adb / 模拟器安装器，按需重新下载）
+vendor/
+
+# 调试与运行产物
+tmp/
+@AutomationLog.txt
+inbox/
+
+# 本会话工作笔记
+.workbuddy/

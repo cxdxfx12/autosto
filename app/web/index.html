@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>运单自动采集自动揽收助手</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+  :root{
+    --bg:#f3f4f7;
+    --panel:#ffffff;
+    --line:#e8eaf0;
+    --line-strong:#dfe2ea;
+    --text:#191d27;
+    --muted:#7a8194;
+    --faint:#a2a8ba;
+    --brand:#f0742c;
+    --brand-deep:#e05f1a;
+    --brand-soft:#fff3ea;
+    --green:#17924c;
+    --green-soft:#e9f8ef;
+    --red:#d3382f;
+    --red-soft:#fdeeed;
+    --amber:#b97708;
+    --amber-soft:#fdf5e4;
+    --blue:#2f6fed;
+    --blue-soft:#eaf1fe;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(23,26,35,.05), 0 6px 20px rgba(23,26,35,.06);
+    --shadow-lg:0 8px 40px rgba(23,26,35,.18);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--bg);
+    color:var(--text);
+    font:14px/1.55 "Segoe UI Variable Text","Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    /* 纵向 flex：让页脚被 margin-top:auto 顶到窗口最底部 */
+    display:flex;flex-direction:column;
+  }
+  .wrap{flex:1;display:flex;flex-direction:column;width:100%;
+    max-width:1120px;margin:0 auto;padding:22px 22px 54px}
+
+  /* ---------- 顶部品牌区 ---------- */
+  /* 顶部品牌行常驻：滚动表格时 logo / 标题 / 引擎状态一直可见 */
+  .brand{display:flex;align-items:center;gap:13px;
+    position:sticky;top:0;z-index:25;
+    background:var(--bg);
+    padding:12px 0 9px;margin:-12px 0 9px;
+    border-bottom:1px solid transparent;transition:border-color .15s,box-shadow .15s}
+  .brand.stuck{border-bottom-color:var(--line);box-shadow:0 6px 12px -10px rgba(20,24,35,.35)}
+  .brand .logo{width:46px;height:46px;flex:none;filter:drop-shadow(0 3px 8px rgba(240,116,44,.28))}
+  .brand h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px}
+  .brand .sub{color:var(--muted);font-size:12px}
+  .brand .col{display:flex;flex-direction:column;line-height:1.35}
+  .spacer{flex:1}
+  .pill{display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:999px;
+    background:var(--panel);border:1px solid var(--line);font-size:12.5px;color:var(--muted);
+    box-shadow:var(--shadow)}
+  .dot{width:8px;height:8px;border-radius:50%;background:#c6cad6;flex:none;transition:background .3s}
+  .dot.on{background:var(--green);box-shadow:0 0 0 3px var(--green-soft)}
+  .dot.warn{background:var(--red);box-shadow:0 0 0 3px var(--red-soft)}
+
+  button{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    font:inherit;font-size:13px;font-weight:500;letter-spacing:.1px;
+    height:32px;padding:0 14px;border-radius:7px;border:1px solid #d7dbe4;
+    background:#fff;color:#2c3140;cursor:pointer;white-space:nowrap;
+    transition:background-color .12s ease,border-color .12s ease,color .12s ease}
+  button:hover{background:#f5f6f9;border-color:#c3c9d6}
+  button:active{background:#eceef4}
+  button:focus-visible{outline:2px solid rgba(224,106,34,.45);outline-offset:1px}
+  button.primary{background:#e06a22;border-color:#d4600f;color:#fff;font-weight:600}
+  button.primary:hover{background:#d15f17;border-color:#bf560e}
+  button.primary:active{background:#bd5513}
+  button.danger{color:#b83a31;border-color:#e6cfcc;background:#fff}
+  button.danger:hover{background:#fbf1f0;border-color:#d8b0ac}
+  button.danger:active{background:#f7e6e4}
+  button:disabled{opacity:.4;cursor:not-allowed;background:#fff}
+  button:disabled:hover{background:#fff;border-color:#d7dbe4}
+  button.ghost{border-color:transparent;background:transparent;color:#6c7385;height:30px;padding:0 10px}
+  button.ghost:hover{background:#eef0f5;border-color:transparent;color:#20242f}
+
+  input[type=number],input[type=text],input[type=date]{font:inherit;padding:7px 11px;border:1px solid var(--line-strong);
+    border-radius:9px;background:#fff;color:var(--text);transition:border-color .15s, box-shadow .15s}
+  input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(240,116,44,.14)}
+  input[type=text].wide{width:230px}
+  select{font:inherit;padding:7px 9px;border:1px solid var(--line-strong);border-radius:9px;background:#fff;color:var(--text)}
+
+  /* ---------- 统计卡片 ---------- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+  .card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 16px 12px;box-shadow:var(--shadow);overflow:hidden}
+  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c,#c6cad6);border-radius:4px 0 0 4px}
+  .card .k{color:var(--muted);font-size:12px;display:flex;align-items:center;gap:6px}
+  .card .v{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:3px;letter-spacing:.3px}
+  .card.ok{--c:#3cbf72}  .card.ok .v{color:var(--green)}
+  .card.dup{--c:#e9b13c} .card.dup .v{color:var(--amber)}
+  .card.fail{--c:#e5594f}.card.fail .v{color:var(--red)}
+  .card.pend{--c:var(--brand)}
+  .card.phone{--c:#8f9bb5}
+  .card.today{--c:#1f7ae0}
+  .card.today .v{color:var(--brand)}
+  .card .tip{color:var(--muted);font-size:11px;margin-top:1px;font-variant-numeric:tabular-nums}
+
+  /* ---------- 面板 ---------- */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:15px 17px;margin-bottom:14px;box-shadow:var(--shadow)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .sub{color:var(--muted);font-size:12px}
+  b{font-weight:650}
+
+  /* 批次进度条 */
+  .prog{height:6px;border-radius:99px;background:#eef0f4;overflow:hidden;margin-top:11px;display:none}
+  .prog.show{display:block}
+  .prog i{display:block;height:100%;width:0;border-radius:99px;
+    background:linear-gradient(90deg,#ffb27a,var(--brand));transition:width .4s ease}
+
+  /* ---------- 服务总开关：界面上唯一需要点的按钮 ---------- */
+  .svc{position:relative;display:flex;align-items:center;gap:17px;flex-wrap:wrap;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:17px 20px;margin-bottom:14px;box-shadow:var(--shadow);
+    transition:border-color .25s ease}
+  .svc.on{border-color:#d5e6dc}
+  .svc .badge{width:48px;height:48px;border-radius:9px;flex:none;display:grid;place-items:center;
+    background:#f4f5f9;color:#8b92a4;transition:background .25s,color .25s}
+  .svc.on .badge{background:#eef7f2;color:#1c7a48}
+  .svc .badge svg{width:25px;height:25px}
+  .svc .txt{display:flex;flex-direction:column;gap:3px;min-width:250px;flex:1}
+  .svc .t1{font-size:17px;font-weight:700;letter-spacing:.2px;display:flex;align-items:center;gap:9px}
+  .svc .t2{color:var(--muted);font-size:12.5px}
+  .svc .wxline{display:flex;align-items:center;gap:6px;margin-top:5px;font-size:12px;color:var(--muted)}
+  .svc .wxline .wxd{width:7px;height:7px;border-radius:50%;background:#c9ced6;flex:none;
+    box-shadow:0 0 0 3px rgba(201,206,214,.22)}
+  .svc .wxline.ok .wxd{background:var(--green);box-shadow:0 0 0 3px rgba(23,146,76,.16)}
+  .svc .wxline.warn .wxd{background:#e0a23a;box-shadow:0 0 0 3px rgba(224,162,58,.18)}
+  .svc .wxline.bad .wxd{background:var(--red);box-shadow:0 0 0 3px rgba(214,64,64,.16)}
+  .svc .wxline a{color:var(--brand-deep);text-decoration:none;font-weight:600;
+    border-bottom:1px dashed rgba(224,116,44,.45);display:none}
+  .svc .wxline a.show{display:inline}
+  .svc .steps{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:6px}
+  .svc .steps span{font-size:11.5px;color:#6a7183;background:#f6f7fa;border:1px solid #e6e9f0;
+    padding:1px 8px;border-radius:5px;transition:color .25s,background .25s,border-color .25s}
+  .svc.on .steps span{color:#2f6a4d;background:#f0f7f3;border-color:#dbeae2}
+  .svc .steps i{color:#c3c8d4;font-style:normal;font-size:11px}
+  .svc.on .steps i{color:#c3d5cb}
+  button.power{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 20px;border-radius:8px;
+    font-size:14px;font-weight:600;letter-spacing:.2px;border:1px solid #d4600f;
+    background:#e06a22;color:#fff;z-index:1}
+  button.power:hover{background:#d15f17;border-color:#bf560e}
+  button.power:active{background:#bd5513}
+  button.power svg{width:17px;height:17px;flex:none}
+  button.power.on{background:#fff;color:#525a6b;border-color:#d7dbe4;font-weight:500}
+  button.power.on:hover{background:#fbf1f0;color:#b83a31;border-color:#e0bcb8}
+
+  /* 当前批次条：有批次才出现，平时不占地方 */
+  .batchbar{display:none;align-items:center;gap:11px;flex-wrap:wrap;background:var(--panel);
+    border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px;margin-bottom:14px;
+    box-shadow:var(--shadow)}
+  .batchbar.show{display:flex}
+  .batchbar .bt{font-size:13px}
+  .batchbar .prog{flex-basis:100%;margin-top:3px}
+
+  /* 摘要条 */
+  .summary-strip{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:var(--brand-soft);border:1px solid #ffd9bd;border-radius:var(--radius);
+    padding:12px 17px;margin-bottom:14px}
+  .summary-strip .ico{width:18px;height:18px;flex:none;opacity:.85}
+  .summary-strip .sub{color:#8a5a33}
+  .summary-strip b{color:#5f3c1d}
+
+  /* ---------- 任务表 ---------- */
+  .table-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);overflow:auto;max-height:52vh}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{position:sticky;top:0;background:#fbfbfd;color:var(--muted);font-weight:600;font-size:12px;
+    text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:1}
+  tbody td{padding:9px 12px;border-bottom:1px solid #f2f3f7;white-space:nowrap;vertical-align:middle}
+  tbody tr:hover{background:#fafbfe}
+  tbody tr:last-child td{border-bottom:0}
+  td.num{font-variant-numeric:tabular-nums}
+  td.wb{font-weight:650;letter-spacing:.4px}
+  .tag{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:999px;font-size:12px;border:1px solid}
+  .tag i{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+  .tag.pending{color:#5c6478;border-color:#e5e7ee;background:#f6f7fa}
+  .tag.running{color:var(--blue);border-color:#c6d9fb;background:var(--blue-soft)}
+  .tag.ok{color:var(--green);border-color:#bfe8cf;background:var(--green-soft)}
+  .tag.fail{color:var(--red);border-color:#f3c5c2;background:var(--red-soft)}
+  .tag.dup{color:var(--amber);border-color:#f0dcae;background:var(--amber-soft)}
+  .tag.skipped{color:#8a8fa0;border-color:#e5e7ee;background:#f6f7fa}
+  .tag.dropped{color:#a0a4b2;border-color:#eceef4;background:#fafbfc;text-decoration:line-through}
+  .muted{color:var(--muted)}
+  .empty{padding:44px 20px;text-align:center;color:var(--muted)}
+  .empty .cat{width:64px;height:64px;opacity:.5;margin-bottom:8px}
+
+  /* token 输入 */
+  .tok{display:none;gap:8px;align-items:center}
+  .tok.show{display:flex}
+
+  /* ---------- 设置中心 ---------- */
+  .psteps{margin:14px 0 6px;padding-left:18px;color:var(--muted);font-size:12.5px;line-height:1.95;text-align:left}
+  .url{display:inline-block;max-width:100%;margin-top:7px;padding:6px 10px;border-radius:8px;
+    background:#f6f7fa;border:1px solid var(--line);font:12px ui-monospace,Menlo,monospace;
+    color:var(--muted);word-break:break-all;cursor:pointer}
+  .url:hover{border-color:var(--line-strong);color:var(--text)}
+  .modal{position:fixed;inset:0;background:rgba(20,23,32,.45);backdrop-filter:blur(3px);
+    display:none;align-items:center;justify-content:center;padding:24px;z-index:50}
+  .modal.show{display:flex;animation:fade .18s ease}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .sheet{background:var(--panel);border-radius:10px;width:100%;max-width:640px;
+    max-height:86vh;display:flex;flex-direction:column;border:1px solid #e2e5ed;
+    box-shadow:0 14px 44px rgba(18,22,32,.2);animation:rise .16s ease}
+  @keyframes rise{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+  .sheet .head{display:flex;align-items:center;gap:9px;padding:13px 18px;border-bottom:1px solid var(--line)}
+  .sheet .head h2{font-size:14.5px;margin:0;font-weight:600;letter-spacing:.2px}
+  .sheet .head .hint{font-size:11.5px;color:#98a0b0}
+  .sheet .body{padding:0 18px;overflow:auto}
+  .sheet section{padding:13px 0 11px;border-bottom:1px solid #f0f2f6}
+  .sheet section:last-child{border-bottom:0}
+  .sheet h3{font-size:12.5px;margin:0 0 9px;font-weight:600;color:#333949;
+    display:flex;align-items:center;gap:7px;letter-spacing:.2px}
+  .sheet h3 .no{width:17px;height:17px;border-radius:4px;background:#f1f3f8;color:#6d7587;
+    display:inline-flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:600;flex:none}
+  .sheet h3 span{font-weight:400;color:#9aa1b1;font-size:11.5px;margin-left:1px}
+  .sheet .row{display:flex;align-items:center;gap:9px;margin-bottom:7px;flex-wrap:wrap}
+  .sheet .row:last-child{margin-bottom:0}
+  .sheet .row.top{align-items:flex-start}
+  .sheet .grow{flex:1;min-width:0}
+  .sheet input,.sheet select{height:30px;font-size:12.5px;border-radius:6px;padding:0 9px}
+  .sheet input[type=date]{padding:0 7px}
+  .sheet textarea{font-size:12.5px;border-radius:6px;padding:7px 9px}
+  .sheet label.f{width:102px;color:#5d6577;font-size:12.5px;flex:none}
+  .sheet .hint{color:#8c94a5;font-size:11.5px;line-height:1.5}
+  .sheet .tip{margin:-1px 0 9px 111px;color:#9aa1b1;font-size:11.5px;line-height:1.6}
+  .sheet .foot{display:flex;align-items:center;gap:8px;padding:11px 18px;border-top:1px solid var(--line);
+    background:#fbfcfd;border-radius:0 0 10px 10px}
+  .sheet .foot .hint{font-size:11px;color:#a2a9b8;max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip{display:inline-block;margin:3px 5px 0 0;padding:2.5px 9px;border-radius:999px;font-size:12px;
+    border:1px solid;font-variant-numeric:tabular-nums}
+  .chip.ok{color:var(--green);border-color:#bfe8cf;background:var(--green-soft)}
+  .chip.bad{color:var(--red);border-color:#f3c5c2;background:var(--red-soft)}
+  .pl{font-size:12px;margin-top:8px}
+  textarea{font:inherit;padding:8px 11px;border:1px solid var(--line-strong);border-radius:9px;
+    width:100%;resize:vertical;background:#fff;color:var(--text)}
+  textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(240,116,44,.14)}
+
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(6px);
+    background:#23262f;color:#fff;padding:10px 18px;border-radius:11px;font-size:13px;
+    opacity:0;pointer-events:none;transition:all .25s;max-width:80vw;box-shadow:var(--shadow-lg);z-index:60}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* 页脚：品牌行居中贴窗口最底部，版本号钉在右下角 */
+  /* 底部品牌行常驻：贴在窗口底部，不随表格滚走 */
+  footer{position:fixed;left:0;right:0;bottom:0;z-index:24;margin:0;
+    padding:8px 22px 7px;border-top:1px solid var(--line);
+    background:rgba(243,244,247,.97);backdrop-filter:blur(8px);
+    color:var(--muted);font-size:12px;text-align:center;min-height:0}
+  footer .brandline{display:flex;gap:7px;align-items:center;justify-content:center;flex-wrap:wrap}
+  footer img{width:17px;height:17px;vertical-align:-4px;border-radius:4px}
+  footer a{color:var(--brand-deep);text-decoration:none;font-weight:600}
+  footer a:hover{text-decoration:underline}
+  footer .ver{position:absolute;right:22px;top:50%;transform:translateY(-50%);
+    font-size:11px;color:var(--muted);opacity:.75}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 512 512" aria-label="喵喵">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#fffaf3"/><stop offset="1" stop-color="#ffe0bb"/>
+        </linearGradient>
+        <linearGradient id="fur" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffc480"/><stop offset="1" stop-color="#f49e4f"/>
+        </linearGradient>
+        <linearGradient id="ear" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffd0a0"/><stop offset="1" stop-color="#eb9440"/>
+        </linearGradient>
+        <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="10"/>
+        </filter>
+      </defs>
+      <rect width="512" height="512" rx="118" fill="url(#bg)"/>
+      <ellipse cx="256" cy="392" rx="150" ry="30" fill="#c4783c" opacity=".18" filter="url(#soft)"/>
+      <path d="M110 214 L140 88 L226 158 Z" fill="url(#ear)"/>
+      <path d="M402 214 L372 88 L286 158 Z" fill="url(#ear)"/>
+      <path d="M134 165 L149 118 L196 156 Z" fill="#fab0b8"/>
+      <path d="M378 165 L363 118 L316 156 Z" fill="#fab0b8"/>
+      <ellipse cx="256" cy="290" rx="165" ry="153" fill="url(#fur)"/>
+      <ellipse cx="256" cy="322" rx="150" ry="120" fill="#fff8ee" opacity=".55"/>
+      <g fill="#e28a3e">
+        <rect x="243" y="150" width="13" height="36" rx="7"/>
+        <rect x="195" y="154" width="11" height="32" rx="6"/>
+        <rect x="306" y="154" width="11" height="32" rx="6"/>
+      </g>
+      <ellipse cx="256" cy="324" rx="88" ry="70" fill="#fff8ee"/>
+      <g>
+        <ellipse cx="196" cy="270" rx="28" ry="33" fill="#3a2a24"/>
+        <ellipse cx="316" cy="270" rx="28" ry="33" fill="#3a2a24"/>
+        <ellipse cx="186" cy="258" rx="10" ry="11" fill="#fff"/>
+        <ellipse cx="306" cy="258" rx="10" ry="11" fill="#fff"/>
+        <ellipse cx="208" cy="286" rx="5" ry="5" fill="#fff" opacity=".65"/>
+        <ellipse cx="328" cy="286" rx="5" ry="5" fill="#fff" opacity=".65"/>
+      </g>
+      <g fill="#fa9694" opacity=".45">
+        <ellipse cx="150" cy="314" rx="26" ry="17"/>
+        <ellipse cx="362" cy="314" rx="26" ry="17"/>
+      </g>
+      <path d="M256 318 l14 10 h-28 Z" fill="#eb8c98"/>
+      <ellipse cx="256" cy="316" rx="8" ry="6" fill="#eb8c98"/>
+      <path d="M219 326 q13 22 37 22 q24 0 37 -22" fill="none" stroke="#3a2a24" stroke-width="5" stroke-linecap="round"/>
+      <path d="M256 328 v8" stroke="#3a2a24" stroke-width="5" stroke-linecap="round"/>
+      <g stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".8">
+        <path d="M120 300 l60 -10"/><path d="M120 326 l60 8"/>
+        <path d="M392 300 l-60 -10"/><path d="M392 326 l-60 8"/>
+      </g>
+    </svg>
+    <div class="col">
+      <h1>运单自动采集自动揽收助手</h1>
+      <span class="sub">杭州喵喵至家网络有限公司 · 专注行业软件开发</span>
+    </div>
+    <span class="spacer"></span>
+    <span class="pill"><span id="connDot" class="dot"></span><span id="connText">连接中…</span></span>
+    <span class="tok" id="tokBox">
+      <input type="text" class="wide" id="tokenInput" placeholder="局域网访问需要填写 token">
+      <button onclick="saveToken()">保存</button>
+    </span>
+  </div>
+
+  <div class="cards">
+    <div class="card today"><div class="k">今日揽收 <span class="sub" id="cTodayDate" style="font-size:11px"></span></div><div class="v" id="cToday">-</div><div class="tip" id="cTodayTip">入库 0 · 待扫 0</div></div>
+    <div class="card pend"><div class="k">待扫</div><div class="v" id="cPending">-</div></div>
+    <div class="card ok"><div class="k">已成功</div><div class="v" id="cOk">-</div></div>
+    <div class="card dup"><div class="k">重复</div><div class="v" id="cDup">-</div></div>
+    <div class="card fail" style="cursor:pointer" onclick="toggleFailOnly()" title="点一下只看失败单（拦截件也在里面）"><div class="k">失败</div><div class="v" id="cFail">-</div></div>
+    <div class="card phone"><div class="k">手机</div><div class="v" id="cPhone" style="font-size:16px;line-height:1.7">未连接</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="row" style="justify-content:space-between">
+      <div><b>按天统计</b> <span class="sub" id="dayHint">近 7 天</span></div>
+      <div class="row" style="gap:6px">
+        <button class="ghost" onclick="loadDaily(7)">7 天</button>
+        <button class="ghost" onclick="loadDaily(14)">14 天</button>
+        <button class="ghost" onclick="loadDaily(30)">30 天</button>
+      </div>
+    </div>
+    <table style="margin-top:8px">
+      <thead><tr><th>日期</th><th>入库</th><th>揽收成功</th><th>重复</th><th>失败</th><th>成功率</th></tr></thead>
+      <tbody id="dayRows"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="svc" id="svcCard">
+    <div class="badge" id="svcBadge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <path d="M6 4.5v15l13-7.5z" fill="currentColor" stroke="none"/>
+      </svg>
+    </div>
+    <div class="txt">
+      <div class="t1"><span id="svcTitle">服务已停止</span></div>
+      <div class="t2" id="svcDesc">点右边「开启服务」，之后不用再管它</div>
+      <div class="wxline" id="svcWx">
+        <span class="wxd" id="wxDot"></span>
+        <span id="wxText">微信：等待中…</span>
+        <a href="javascript:void(0)" id="wxFix" onclick="openGroupNow()">切到采集群</a>
+      </div>
+      <div class="steps">
+        <span>盯群采集</span><i>→</i><span>自动入库</span><i>→</i><span>下发给手机</span><i>→</i><span>扫入申行者</span>
+      </div>
+    </div>
+    <button class="power" id="btnPower" onclick="toggleService()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+        <path d="M12 3v9"/><path d="M6.5 6.5a8 8 0 1 0 11 0"/>
+      </svg>
+      <span id="btnPowerText">开启服务</span>
+    </button>
+  </div>
+
+  <div class="batchbar" id="batchBar">
+    <span class="bt" id="batchText"></span>
+    <span class="spacer"></span>
+    <button class="primary" id="btnRunNow" onclick="runNow()" title="马上操作手机跑一轮（不用等监听的下次轮询）。动手前会自动请钉钉桥让路，避免抢前台">⚡ 立即抓取</button>
+    <button class="primary" onclick="sendToPhone()" title="扫码把本批单号送到手机，粘贴进申行者">发到手机</button>
+    <button id="btnPause" onclick="batchAction('pause')">暂停</button>
+    <button id="btnResume" onclick="batchAction('resume')">继续</button>
+    <button class="danger" id="btnClear" onclick="clearPending()" title="把今天尚未揽收的单号移出待扫队列（记录保留，不删除）">清除待扫</button>
+    <button class="danger" id="btnClearRetry" onclick="clearRetry()" title="把今天所有失败/跳过的单号一次性作废，不再显示「重试」按钮（成功的绝不动）">清除重试</button>
+    <button class="danger" id="btnAbort" onclick="batchAction('abort')">中止本批</button>
+    <div class="prog" id="prog"><i></i></div>
+  </div>
+
+  <div class="summary-strip">
+    <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="#e0742c" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 2.5"/>
+    </svg>
+    <span class="sub" id="summary">读取设置中…</span>
+    <span class="spacer"></span>
+    <button class="primary" id="btnRunNow2" onclick="runNow()" title="马上操作手机跑一轮（不用等监听的下次轮询）。动手前会自动请钉钉桥让路，避免抢前台">⚡ 立即抓取</button>
+    <button class="ghost" id="btnFailOnly" onclick="toggleFailOnly()" title="拦截件、超重这类失败单混在几百条成功里很难找，点这里只列失败的">只看失败</button>
+    <button class="ghost" onclick="sendToPhone()" title="扫码把单号送到手机，粘贴进申行者">发到手机</button>
+    <button class="ghost" onclick="importInbox()" title="把表格丢进 inbox 目录也能扫">扫 inbox 目录</button>
+    <button class="primary" onclick="openSettings()">设置中心</button>
+  </div>
+
+  <div class="row" id="dayFilterBar" style="display:none;margin-bottom:8px">
+    <span class="sub">只看 <b id="dayFilterText"></b> 的单号</span>
+    <button class="ghost" onclick="pickDay(null)">显示全部</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>#</th><th>运单号</th><th>来源</th><th>状态</th><th>尝试</th><th>结果 / 错误</th><th>时间</th><th></th></tr>
+      </thead>
+      <tbody id="tbody"><tr><td colspan="8" class="empty">加载中…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal" id="settingsModal">
+  <div class="sheet">
+    <div class="head">
+      <h2>设置中心</h2>
+      <span class="hint">改完点保存，立即生效</span>
+      <span class="spacer"></span>
+      <button class="ghost" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="body">
+
+      <section>
+        <h3><span class="no">1</span>入库规则<span>决定哪些单号能进扫描队列</span></h3>
+        <div class="row">
+          <label class="f">入库号段</label>
+          <input type="text" id="sPrefixes" placeholder="77, 621" style="width:150px">
+          <span class="hint">逗号分隔 · 77＝申通，621＝丹鸟</span>
+        </div>
+        <div class="row">
+          <label class="f">单号位数</label>
+          <input type="text" id="sLengths" placeholder="15" style="width:110px">
+          <span class="hint">如 15 或 12,13,15</span>
+        </div>
+        <div class="row top">
+          <label class="f" style="padding-top:7px">试算</label>
+          <div class="grow">
+            <textarea id="sPreview" rows="2" placeholder="把群里那条消息粘进来，看会入库几条、哪些被挡掉"></textarea>
+            <div class="row" style="margin:7px 0 0">
+              <button onclick="runPreview()">试一下</button>
+              <span class="hint">不发消息、不入库，只看结果</span>
+            </div>
+            <div id="sPreviewOut"></div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h3><span class="no">2</span>微信群采集<span>程序自己点开群，不用手动切</span></h3>
+        <div class="row">
+          <label class="f">群名</label>
+          <input type="text" id="sGroup" list="wxGroups" placeholder="例如：自动揽收测试群" class="grow">
+          <datalist id="wxGroups"></datalist>
+          <button id="btnLoadGroups" onclick="loadWxGroups()">读取会话</button>
+        </div>
+        <div class="tip">手打差一个字就永远采不到，建议点「读取会话」直接选。</div>
+        <div class="row">
+          <label class="f">采集时间</label>
+          <select id="sWindow" onchange="syncWindowInputs()" style="width:106px">
+            <option value="today">仅当天</option>
+            <option value="range">指定日期</option>
+            <option value="all">不限</option>
+          </select>
+          <input type="date" id="sStart" style="width:138px">
+          <span class="hint">至</span>
+          <input type="date" id="sEnd" style="width:138px">
+        </div>
+        <div class="tip">默认仅当天，翻旧账不会把历史单重新扫一遍（会产生真实轨迹）；判不出日期的消息宁可跳过。</div>
+        <div class="row">
+          <label class="f">采集间隔</label>
+          <select id="sInterval" style="width:150px">
+            <option value="0">实时（每 2~3 秒）</option>
+            <option value="60">1 分钟</option>
+            <option value="180">3 分钟</option>
+            <option value="300">5 分钟</option>
+            <option value="600">10 分钟</option>
+            <option value="900">15 分钟</option>
+            <option value="1800">30 分钟</option>
+          </select>
+          <span class="hint">到点才读一次微信，平时不碰键鼠</span>
+        </div>
+        <div class="tip">采集要读微信窗口、切群会挪一下鼠标。选 5 / 10 / 15 分钟就只按点看一次；保存即时生效。</div>
+      </section>
+
+      <section>
+        <h3><span class="no">3</span>高级<span>一般不用改，默认按申行者上限走</span></h3>
+        <div class="row">
+          <label class="f">单批数量</label>
+          <input type="number" id="sBatchMax" min="1" max="500" style="width:80px">
+          <span class="hint">申行者单次上限 500，超出自动排下一批</span>
+        </div>
+        <div class="row">
+          <label class="f">失败重试</label>
+          <input type="number" id="sAttempts" min="0" max="10" style="width:80px">
+          <span class="hint">含首次，2 表示失败后再试一次</span>
+        </div>
+      </section>
+
+    </div>
+    <div class="foot">
+      <span class="hint" id="sPath"></span>
+      <span class="spacer"></span>
+      <button onclick="closeSettings()">取消</button>
+      <button class="primary" id="sSave" onclick="saveAll()">保存设置</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="phoneModal">
+  <div class="sheet" style="max-width:430px">
+    <div class="head">
+      <h2>发到手机</h2>
+      <span class="hint">扫一下，复制，粘贴到申行者</span>
+      <span class="spacer"></span>
+      <button class="ghost" onclick="closePhone()">✕</button>
+    </div>
+    <div class="body" style="padding:18px 22px 4px;text-align:center">
+      <img id="qrImg" alt="二维码" style="width:190px;height:190px;border:1px solid var(--line);
+        border-radius:12px;padding:7px;background:#fff">
+      <div class="hint" id="phoneCount" style="margin-top:9px"></div>
+      <div class="url" id="phoneUrl" onclick="copyPhoneUrl()" title="点一下复制地址"></div>
+      <ol class="psteps">
+        <li>手机相机或微信扫码，打开这个页面</li>
+        <li>点「复制全部单号」</li>
+        <li>申行者 → 揽件扫描 → 长按输入框粘贴 → 右上角「确定」</li>
+      </ol>
+      <div class="hint" style="color:var(--brand-deep);margin-bottom:8px">
+        别勾「扫描枪输入」—— 那是给巴枪用的，勾了就不吃粘贴文本
+      </div>
+    </div>
+    <div class="foot">
+      <span class="hint" id="phoneExp"></span>
+      <span class="spacer"></span>
+      <button onclick="closePhone()">关闭</button>
+      <button class="primary" onclick="sendToPhone()">刷新二维码</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+
+const $ = (id) => document.getElementById(id);
+let TOKEN = sessionStorage.getItem("sto_token") || "";
+
+function toast(msg){
+  const el = $("toast");
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove("show"), 2600);
+}
+
+async function api(path, opts={}){
+  const headers = Object.assign({"Content-Type":"application/json"}, opts.headers || {});
+  if (TOKEN) headers["X-Token"] = TOKEN;
+  const res = await fetch(path, Object.assign({}, opts, {headers}));
+  if (res.status === 401){
+    $("tokBox").classList.add("show");
+    throw new Error("需要 token：请填写后重试");
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok){
+    throw new Error(data.error ? data.error.message : ("HTTP " + res.status));
+  }
+  return data;
+}
+
+function saveToken(){
+  TOKEN = $("tokenInput").value.trim();
+  sessionStorage.setItem("sto_token", TOKEN);
+  $("tokBox").classList.remove("show");
+  refresh();
+}
+
+const STATUS_TEXT = {pending:"待扫", running:"扫描中", ok:"成功", fail:"失败", dup:"重复", skipped:"跳过", dropped:"已作废"};
+
+// ---------- 设置中心 ----------
+
+let SETTINGS = null;
+let savedGroup = "";   // 上次保存的群名：改了才触发自动切群
+let SVC_INTERVAL = 0;  // 当前采集间隔（秒），服务卡片上要显示
+
+async function loadSettings(){
+  try{
+    const d = await api("/api/settings");
+    SETTINGS = d.settings;
+    fillSettings(d);
+    renderSummary(d.settings);
+  }catch(err){
+    $("summary").textContent = "设置读取失败：" + err.message;
+  }
+}
+
+function fillSettings(d){
+  const s = d.settings;
+  $("sPrefixes").value = (s.prefixes || []).join(", ");
+  $("sLengths").value = (s.lengths || []).join(", ");
+  $("sGroup").value = s.group_name || "";
+  savedGroup = (s.group_name || "").trim();
+  $("sWindow").value = s.window || "today";
+  $("sStart").value = s.window_start || "";
+  $("sEnd").value = s.window_end || "";
+  $("sBatchMax").value = s.batch_max;
+  $("sAttempts").value = s.max_attempts;
+  setIntervalSelect(s.interval_sec || 0);
+  $("sPath").textContent = "数据库 " + d.paths.db;
+  syncWindowInputs();
+}
+
+/* 采集间隔：配置里可能是下拉框里没有的秒数（比如手改 config.yaml），补一个选项兜住 */
+function setIntervalSelect(sec){
+  const sel = $("sInterval");
+  const v = String(sec || 0);
+  if (![...sel.options].some(o => o.value === v)){
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = fmtInterval(sec);
+    sel.appendChild(opt);
+  }
+  sel.value = v;
+}
+
+function fmtInterval(sec){
+  if (!sec) return "实时";
+  if (sec % 60 === 0 && sec < 3600) return `${sec / 60} 分钟`;
+  if (sec % 3600 === 0) return `${sec / 3600} 小时`;
+  return `${sec} 秒`;
+}
+
+/* 「每 10 分钟采一次」/「实时采集」—— 0 秒不能说成「每 实时 采一次」 */
+function everyText(sec){
+  return sec > 0 ? `每 ${fmtInterval(sec)}采一次` : "实时采集";
+}
+
+function fmtDur(sec){
+  sec = Math.max(0, Math.round(sec));
+  if (sec < 60) return `${sec} 秒`;
+  const m = Math.floor(sec / 60), s = sec % 60;
+  if (m < 60) return s ? `${m} 分 ${s} 秒` : `${m} 分钟`;
+  const h = Math.floor(m / 60), mm = m % 60;
+  return mm ? `${h} 小时 ${mm} 分` : `${h} 小时`;
+}
+
+function renderSummary(s){
+  const win = s.window === "today" ? "仅当天"
+            : s.window === "range" ? `${s.window_start || "?"} ~ ${s.window_end || "?"}`
+            : "不限时间";
+  const group = s.group_name ? s.group_name : "（未设置采集群）";
+  $("summary").innerHTML =
+    `采集群 <b>${escapeHtml(group)}</b>` +
+    ` · ${win}` +
+    ` · ${everyText(s.interval_sec || 0)}` +
+    ` ｜ 单号 <b>${(s.prefixes || []).join("/") || "不限"}</b> 开头 · <b>${(s.lengths || []).join("/") || "不限"}</b> 位` +
+    ` ｜ 每批最多 <b>${s.batch_max}</b> 条`;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function openSettings(){
+  $("settingsModal").classList.add("show");
+  loadSettings();
+}
+function closeSettings(){
+  $("settingsModal").classList.remove("show");
+}
+
+/* ---------- 发到手机：申行者「揽件扫描」支持一次粘贴 500 条 ---------- */
+let PHONE_TIMER = null;
+
+async function sendToPhone(){
+  try{
+    const d = await api("/api/mobile/ticket", {method:"POST", body: JSON.stringify({})});
+    $("phoneModal").classList.add("show");
+    $("qrImg").src = "/api/mobile/qr.png?t=" + encodeURIComponent(d.ticket) + "&_=" + Date.now();
+    $("phoneCount").textContent = `本批 ${d.count} 个待扫单号`;
+    $("phoneUrl").textContent = d.url;
+    $("phoneUrl").dataset.url = d.url;
+    startPhoneTimer(d.expires_in || 900);
+  }catch(e){
+    toast(e.message);
+  }
+}
+
+function startPhoneTimer(seconds){
+  clearInterval(PHONE_TIMER);
+  const end = Date.now() + seconds * 1000;
+  const paint = () => {
+    const left = Math.round((end - Date.now()) / 1000);
+    if (left <= 0){
+      $("phoneExp").textContent = "已过期，点「刷新二维码」重新生成";
+      clearInterval(PHONE_TIMER);
+      return;
+    }
+    $("phoneExp").textContent = left >= 60
+      ? `链接 ${Math.ceil(left / 60)} 分钟内有效`
+      : `链接 ${left} 秒后过期`;
+  };
+  paint();
+  PHONE_TIMER = setInterval(paint, 1000);
+}
+
+function closePhone(){
+  clearInterval(PHONE_TIMER);
+  $("phoneModal").classList.remove("show");
+}
+
+function copyPhoneUrl(){
+  const url = $("phoneUrl").dataset.url || "";
+  if (!url) return;
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(() => toast("地址已复制"), () => toast(url));
+  } else {
+    toast(url);
+  }
+}
+
+function syncWindowInputs(){
+  const range = $("sWindow").value === "range";
+  $("sStart").disabled = !range;
+  $("sEnd").disabled = !range;
+}
+
+async function saveAll(){
+  const btn = $("sSave");
+  btn.disabled = true;
+  try{
+    await api("/api/settings/scan", {
+      method:"POST",
+      body: JSON.stringify({prefixes: $("sPrefixes").value, lengths: $("sLengths").value})
+    });
+    await api("/api/settings/wechat", {
+      method:"POST",
+      body: JSON.stringify({
+        group_name: $("sGroup").value,
+        window: $("sWindow").value,
+        window_start: $("sStart").value,
+        window_end: $("sEnd").value,
+        interval_sec: parseInt($("sInterval").value, 10) || 0
+      })
+    });
+    await api("/api/settings/limits", {
+      method:"POST",
+      body: JSON.stringify({
+        batch_max: parseInt($("sBatchMax").value, 10) || 500,
+        max_attempts: parseInt($("sAttempts").value, 10) || 0,
+        auto_mode: true
+      })
+    });
+    // 群名改了就让程序立刻切过去，别等采集线程下一轮退避（最长 5 分钟）
+    const want = ($("sGroup").value || "").trim();
+    if (want && want !== savedGroup){
+      try{
+        const d = await api("/api/wechat/open", {method:"POST", body: JSON.stringify({name: want})});
+        toast(d.ok ? `已保存，并切到「${d.opened}」` : "已保存，但微信里没找到这个群");
+        closeSettings();
+        await loadSettings();
+        await refresh();
+        return;
+      }catch(_e){ /* 采集线程没起来时忽略，保存本身已生效 */ }
+    }
+    toast("设置已保存，立即生效");
+    closeSettings();
+    await loadSettings();
+    await refresh();
+  }catch(err){
+    toast("保存失败：" + err.message);
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+async function runPreview(){
+  const out = $("sPreviewOut");
+  out.innerHTML = '<span class="sub">试算中…</span>';
+  try{
+    const d = await api("/api/settings/preview", {
+      method:"POST",
+      body: JSON.stringify({
+        text: $("sPreview").value,
+        prefixes: $("sPrefixes").value,
+        lengths: $("sLengths").value
+      })
+    });
+    if (!d.hits.length && !d.rejects.length){
+      out.innerHTML = '<span class="sub">没找到像单号的数字串。</span>';
+      return;
+    }
+    const hits = d.hits.map(v => `<span class="chip ok">${escapeHtml(v)}</span>`).join("");
+    const rejects = d.rejects
+      .map(r => `<span class="chip bad" title="${escapeHtml(r.reason)}">${escapeHtml(r.value)}</span>`)
+      .join("");
+    out.innerHTML =
+      (hits ? `<div class="pl">会入库 ${d.hits.length} 条：${hits}</div>` : "") +
+      (rejects ? `<div class="pl">被规则挡掉 ${d.rejects.length} 条：${rejects}</div>` : "");
+  }catch(err){
+    out.innerHTML = `<span class="sub">试算失败：${escapeHtml(err.message)}</span>`;
+  }
+}
+
+
+function fmtTime(s){
+  if (!s) return "-";
+  const d = new Date(s);
+  if (isNaN(d)) return s;
+  const p = (n) => String(n).padStart(2,"0");
+  return `${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+// 单行渲染：失败行优先显示 last_error（拦截/超重这类原因），成功行优先 result_raw；
+// 反过来的话批量回写的备注「申行者批量揽收」会把真正的原因盖住
+function jobRow(j){
+  const canRetry = (j.status === "fail" || j.status === "skipped");
+  const info = (j.status === "fail" || j.status === "skipped")
+    ? (j.last_error || j.result_raw || "")
+    : (j.result_raw || j.last_error || "");
+  return `<tr>
+    <td class="num muted">${j.id}</td>
+    <td class="num" style="font-weight:600">${j.waybill}</td>
+    <td class="muted">${j.source}</td>
+    <td><span class="tag ${j.status}">${STATUS_TEXT[j.status] || j.status}</span></td>
+    <td class="num">${j.attempts}</td>
+    <td class="muted" style="white-space:normal;max-width:280px">${info}</td>
+    <td class="muted num">${fmtTime(j.scanned_at || j.created_at)}</td>
+    <td>${canRetry ? `<button onclick="retryJob(${j.id})">重试</button>` : ""}</td>
+  </tr>`;
+}
+
+function groupRow(text){
+  return `<tr><td colspan="8" style="background:#fafbfe;font-weight:600;color:#6b7280">${text}</td></tr>`;
+}
+
+// pinned：失败/拦截件单独查一份置顶显示。
+// 为什么必须置顶：列表按 id 倒序只取最近 200 条，失败单往往是最早入库的那几条，
+// 一天几百单下来必然被新单挤出窗口（实测 2026-10-26 拦截件 id=1032 掉到 1073 之后，
+// 界面上怎么翻都找不到）。
+function renderJobs(jobs, pinned){
+  const tbody = $("tbody");
+  const pin = pinned || [];
+  if (!jobs.length && !pin.length){
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">还没有任务。把 Excel 丢进 inbox 目录，或等微信群采集。</td></tr>';
+    return;
+  }
+  let html = "";
+  if (pin.length){
+    html += groupRow(`失败 / 拦截 ${pin.length} 条（置顶，方便核对）`);
+    html += pin.map(jobRow).join("");
+    if (jobs.length) html += groupRow(`全部单号（最近 ${jobs.length} 条）`);
+  }
+  html += jobs.map(jobRow).join("");
+  tbody.innerHTML = html;
+}
+
+function renderService(svc){
+  const on = !!(svc && svc.running);
+  const card = $("svcCard");
+  card.classList.toggle("on", on);
+
+  $("svcBadge").innerHTML = on
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+         <path d="M8 5h3v14H8z" fill="currentColor" stroke="none"/>
+         <path d="M14 5h3v14h-3z" fill="currentColor" stroke="none"/>
+       </svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+         <path d="M6 4.5v15l13-7.5z" fill="currentColor" stroke="none"/>
+       </svg>`;
+
+  $("btnPower").classList.toggle("on", on);
+  $("btnPowerText").textContent = on ? "停止服务" : "开启服务";
+
+  const group = svc && svc.group_name;
+  if (on){
+    $("svcTitle").textContent = "服务运行中 · 全自动";
+    $("svcDesc").textContent = group
+      ? `正在盯「${group}」，${everyText(SVC_INTERVAL)}，有新单就自动入库、下发给手机（每批最多 500 条）`
+      : "还没设置采集群，点「设置中心」填群名后才会开始采集";
+    $("svcDesc").style.color = group ? "" : "var(--red)";
+  }else{
+    $("svcTitle").textContent = "服务已停止";
+    $("svcDesc").textContent = "点右边「开启服务」，之后不用再管它";
+    $("svcDesc").style.color = "";
+  }
+}
+
+/* 从微信实时读会话列表，填进 datalist 让用户直接选。
+   手打群名差一个字就永远匹配不上 —— 这是「开了服务没采到」最常见的坑。 */
+async function loadWxGroups(){
+  const btn = $("btnLoadGroups");
+  const old = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "读取中…微信会滚一下";
+  try{
+    const d = await api("/api/wechat/sessions", {method:"POST"});
+    const list = d.sessions || [];
+    $("wxGroups").innerHTML = list
+      .map(n => `<option value="${escapeHtml(n)}"></option>`).join("");
+    toast(`读到 ${list.length} 个会话，点输入框箭头就能选`);
+    $("sGroup").focus();
+  }catch(err){
+    toast(err.message);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = old;
+  }
+}
+
+/* 微信采集实时状态：直说「在采什么 / 为什么没采」，别让人去翻日志。
+   这是上次「开了服务却没采到消息」的直接教训 —— 界面上当时一个字都没有。 */
+function renderWechat(wx, svc){
+  const box = $("svcWx");
+  const text = $("wxText");
+  const fix = $("wxFix");
+  const running = !!(svc && svc.running);
+  box.classList.remove("ok", "warn", "bad");
+  fix.classList.remove("show");
+  if (!running){
+    text.textContent = "微信：服务未开启";
+    return;
+  }
+  if (!wx || !wx.collector){
+    box.classList.add("warn");
+    text.textContent = "微信：采集线程还没起来（稍等几秒）";
+    return;
+  }
+  const st = wx.state || "";
+  const iv = wx.interval_sec || 0;
+  const nextIn = wx.next_in || 0;
+  if (st.startsWith("采集中")){
+    box.classList.add("ok");
+    let line = "微信：" + st.replace(/^采集中/, "正在盯");
+    if (iv > 0){
+      line += nextIn > 0
+        ? ` · ${everyText(iv)}，${fmtDur(nextIn)}后再采`
+        : ` · ${everyText(iv)}，正在读`;
+    } else {
+      line += " · 实时盯着";
+    }
+    text.textContent = line;
+  } else if (st.startsWith("已自动切换") || st.startsWith("已切换")){
+    box.classList.add("ok");
+    text.textContent = "微信：" + st;
+  } else if (st.startsWith("找不到群")){
+    box.classList.add("bad");
+    text.textContent = "微信：" + st + " —— 群名可能不对，去设置中心重新选";
+    fix.classList.add("show");
+  } else if (st.startsWith("当前会话是")){
+    box.classList.add("warn");
+    text.textContent = "微信：" + st + "，不在采集群";
+    fix.classList.add("show");
+  } else {
+    text.textContent = "微信：" + (st || "等待中…");
+  }
+}
+
+async function openGroupNow(){
+  const svc = (await api("/api/stats")).service || {};
+  const name = svc.group_name;
+  if (!name){ toast("还没设置采集群"); return; }
+  const fix = $("wxFix");
+  fix.textContent = "正在切换…";
+  try{
+    const d = await api("/api/wechat/open", {method:"POST", body: JSON.stringify({name})});
+    toast(d.ok ? `已切到「${d.opened}」` : "没找到这个群，请核对群名");
+    setTimeout(refresh, 600);
+  }catch(err){
+    toast(err.message);
+  }finally{
+    fix.textContent = "切到采集群";
+  }
+}
+
+async function toggleService(){
+  const btn = $("btnPower");
+  const on = $("svcCard").classList.contains("on");
+  btn.disabled = true;
+  try{
+    const d = await api("/api/service", {
+      method:"POST",
+      body: JSON.stringify({running: !on})
+    });
+    toast(!on ? "服务已开启，正在自动盯群采集" : "服务已停止，不再采集和下发");
+    renderService(d.settings);
+    refresh();
+  }catch(err){
+    toast(err.message);
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function renderBatch(b, counts){
+  const bar = $("batchBar");
+  const prog = $("prog");
+  const active = b && (b.status === "running" || b.status === "paused");
+  bar.classList.toggle("show", !!active);
+  if (!active){
+    prog.classList.remove("show");
+    prog.querySelector("i").style.width = "0%";
+    return;
+  }
+  const c = counts || {};
+  // 进度条按「已收口」算：成功/重复/失败/跳过/作废都算有结论的单，
+  // 不然批次全收口了进度条还卡在 90% 会让人以为没跑完
+  const done = (c.ok || 0) + (c.dup || 0) + (c.fail || 0) + (c.skipped || 0) + (c.dropped || 0);
+  const pct = b.limit_n ? Math.min(100, Math.round(done / b.limit_n * 100)) : 0;
+  $("batchText").innerHTML = b.status === "paused"
+    ? `批次 <b>${b.id}</b> ｜ 已暂停，手机暂时领不到任务`
+    : `批次 <b>${b.id}</b> ｜ 本批 <b>${b.limit_n}</b> 条 ｜ 已完成 <b>${done}</b> 条`;
+  prog.classList.add("show");
+  prog.querySelector("i").style.width = pct + "%";
+  $("btnPause").disabled = b.status !== "running";
+  $("btnResume").disabled = b.status !== "paused";
+  if ($("btnClear")) $("btnClear").disabled = !(c.pending > 0);
+}
+
+let DAYS = 7;
+let DAY_FILTER = null;
+let FAIL_ONLY = false;
+function pickDay(d){
+  DAY_FILTER = d || null;
+  const bar = $("dayFilterBar");
+  bar.style.display = DAY_FILTER ? "flex" : "none";
+  if (DAY_FILTER) $("dayFilterText").textContent = DAY_FILTER;
+  refresh();
+}
+
+// 只看失败/跳过：几百条成功里找那几条拦截件、超重的，不用滚半天
+function toggleFailOnly(){
+  FAIL_ONLY = !FAIL_ONLY;
+  $("btnFailOnly").textContent = FAIL_ONLY ? "显示全部" : "只看失败";
+  refresh();
+}
+
+async function loadDaily(days){
+  DAYS = days || DAYS || 7;
+  $("dayHint").textContent = `近 ${DAYS} 天`;
+  try{
+    const r = await api(`/api/stats/daily?days=${DAYS}`);
+    const rows = r.items || [];
+    const tb = $("dayRows");
+    if (!rows.length){
+      tb.innerHTML = '<tr><td colspan="6" class="empty">还没有数据，从今天起每天累积</td></tr>';
+      return;
+    }
+    tb.innerHTML = rows.map(d => {
+      const hit = d.ok + d.dup + d.fail;
+      const rate = hit ? Math.round((d.ok + d.dup) / hit * 100) : 0;
+      return `<tr onclick="pickDay('${d.date}')" style="cursor:pointer" title="点击只看这天的单号">`
+           + `<td>${d.date}</td><td>${d.enqueued}</td><td><b>${d.ok}</b></td>`
+           + `<td>${d.dup}</td><td>${d.fail}</td><td>${hit ? rate + '%' : '—'}</td></tr>`;
+    }).join("");
+  }catch(err){
+    $("dayRows").innerHTML = `<tr><td colspan="6" class="empty">${err.message}</td></tr>`;
+  }
+}
+
+async function refresh(){
+  try{
+    const stats = await api("/api/stats");
+    const c = stats.counts || {};
+    $("connDot").classList.add("on");
+    $("connText").textContent = "引擎在线";
+    $("cPending").textContent = c.pending || 0;
+    const t = stats.today || {};
+    $("cToday").textContent = t.ok || 0;
+    $("cTodayDate").textContent = (t.date || "").slice(5);
+    $("cTodayTip").textContent = `入库 ${t.enqueued || 0} · 待扫 ${t.pending || 0}`;
+    $("cTodayTip").title = `今日成功 ${t.ok || 0} ｜ 重复 ${t.dup || 0} ｜ 失败 ${t.fail || 0} ｜ 入库 ${t.enqueued || 0}`;
+    $("cOk").textContent = c.ok || 0;
+    $("cDup").textContent = c.dup || 0;
+    $("cFail").textContent = c.fail || 0;
+
+    SVC_INTERVAL = (stats.wechat && stats.wechat.interval_sec) || SVC_INTERVAL;
+    renderService(stats.service);
+    renderWechat(stats.wechat, stats.service);
+    renderBatch(stats.batch, c);
+
+    const p = stats.phone || {};
+    if (p.last_seen){
+      const ago = Math.round((Date.now() - new Date(p.last_seen).getTime()) / 1000);
+      const label = ({adb: "USB 在线", autojs: "脚本在线"})[p.page] || p.page || "在线";
+      $("cPhone").textContent = ago < 180 ? `${label}（${ago}s）` : `无活动 ${Math.round(ago / 60)} 分钟`;
+    } else {
+      $("cPhone").textContent = "未连接";
+    }
+
+    const dayQs = DAY_FILTER ? `&day=${DAY_FILTER}` : "";
+    if (FAIL_ONLY){
+      const data = await api("/api/jobs?limit=200&status=fail" + dayQs);
+      renderJobs(data.jobs || [], []);
+    } else {
+      // 主列表 + 失败单两份并行取：失败单置顶显示，不依赖它是否落在最近 200 条里
+      const [main, fails] = await Promise.all([
+        api("/api/jobs?limit=200" + dayQs),
+        api("/api/jobs?limit=50&status=fail" + dayQs).catch(() => ({jobs: []})),
+      ]);
+      const failJobs = fails.jobs || [];
+      const seen = new Set(failJobs.map(j => j.id));
+      renderJobs((main.jobs || []).filter(j => !seen.has(j.id)), failJobs);
+    }
+  }catch(err){
+    $("connDot").classList.remove("on");
+    $("connText").textContent = err.message;
+  }
+}
+
+async function batchAction(action){
+  const stats = await api("/api/stats");
+  if (!stats.batch){ toast("当前没有进行中的批次"); return; }
+  try{
+    await api(`/api/batches/${stats.batch.id}/status`, {method:"POST", body: JSON.stringify({action})});
+    toast("已" + ({pause:"暂停", resume:"继续", abort:"中止"})[action]);
+    refresh();
+  }catch(err){ toast(err.message); }
+}
+
+async function clearPending(){
+  let n = 0, day = "";
+  try{
+    const stats = await api("/api/stats");
+    const t = stats.today || {};
+    n = t.pending != null ? t.pending : ((stats.counts && stats.counts.pending) || 0);
+    day = t.date || "";
+  }catch(err){ toast(err.message); return; }
+  if (!n){ toast("待扫队列已经是空的"); return; }
+  if (!confirm(`清除 ${day || "今天"} 的 ${n} 条待扫？\n\n· 这些单号本轮不再下发手机\n· 记录保留在列表里，可单条重试`)) return;
+  try{
+    const d = await api("/api/jobs/clear-pending", {method:"POST", body: JSON.stringify({})});
+    toast(d.cleared ? `已清除 ${d.cleared} 条待扫` : "待扫队列已经是空的");
+    refresh(); loadDaily(DAYS);
+  }catch(err){ toast(err.message); }
+}
+
+async function runNow(){
+  // 「立即抓取」：只负责给监听进程留句话，真正操作手机的还是 tools/phone_watch.py。
+  // 后端是打包产物（core/miao-core.exe），里面没有 adb 脚本，也不能在请求里
+  // 跑几分钟的手机流程 —— 所以这里必然是异步的，点了不代表马上就开始。
+  // 按钮有两份（批次栏 + 底部工具栏，批次栏没有批次时是隐藏的），状态要一起切。
+  const btns = [$("btnRunNow"), $("btnRunNow2")].filter(Boolean);
+  const old = btns.map(b => b.textContent);
+  const restore = () => btns.forEach((b, i) => { b.disabled = false; b.textContent = old[i]; });
+  btns.forEach(b => { b.disabled = true; b.textContent = "正在定位微信群…"; });
+  try{
+    // 后端会先「定位微信群 → 采集新单入队」，再通知监听去揽收。
+    // 这两步都在一次请求里，所以要给足时间（切群+读屏+解析表格可能几十秒）。
+    const d = await api("/api/run/now", {method:"POST", body: JSON.stringify({})});
+    const col = d.collect || {};
+    if (col.ok){
+      // new = 文本消息新增，inserted = 表格文件里新解析出的单号
+      const got = (col.new || 0) + (col.inserted || 0);
+      if (col.baselined){
+        toast("首次采集已建立基线（历史消息不重采），正在派给手机");
+      }else if (got){
+        toast(`采到 ${got} 个新单号，正在派给手机`);
+      }else{
+        toast("群里没有新单号，正在把积压派给手机");
+      }
+    }else if (col.error){
+      // 采集失败也说清楚，但流程继续 —— 队列里可能本来就有积压
+      toast("采集没成功：" + col.error);
+    }
+    btns.forEach(b => { b.textContent = "等手机接单…"; });
+    let waited = 0;
+    const timer = setInterval(async () => {
+      waited += 2;
+      try{
+        const s = await api("/api/stats");
+        if (!s.run_pending){
+          clearInterval(timer);
+          restore();
+          const pend = (s.today && s.today.pending) || 0;
+          toast(pend ? "手机已开始执行" : "队列里没有待扫单号：群里这段时间没新单");
+          refresh();
+        } else if (waited >= 30){
+          clearInterval(timer);
+          restore();
+          toast("30 秒内没被接单：监听进程没在跑？");
+        }
+      }catch(err){
+        clearInterval(timer);
+        restore();
+      }
+    }, 2000);
+  }catch(err){
+    toast(err.message || "请求失败");
+    restore();
+  }
+}
+
+async function clearRetry(){
+  // 先查一下今天有多少条可重试的，让用户看清要作废多少条再确认
+  let n = 0, day = "";
+  try{
+    const stats = await api("/api/stats");
+    const c = stats.counts || {};
+    n = (c.fail || 0) + (c.skipped || 0);
+    day = (stats.today && stats.today.date) || "";
+  }catch(err){ toast(err.message); return; }
+  if (!n){ toast("没有需要清除的重试记录"); return; }
+  if (!confirm(`把 ${day || "今天"} 的 ${n} 条「失败/跳过」全部作废？\n\n· 这些单号不再显示「重试」按钮\n· 已经成功的记录不会动\n· 操作不可撤销`)) return;
+  try{
+    const d = await api("/api/jobs/clear-retry", {method:"POST", body: JSON.stringify({})});
+    toast(d.cleared ? `已清除 ${d.cleared} 条重试记录` : "没有需要清除的重试记录");
+    refresh(); loadDaily(DAYS);
+  }catch(err){ toast(err.message); }
+}
+
+async function importInbox(){
+  try{
+    const data = await api("/api/imports/inbox", {method:"POST", body:"{}"});
+    const rs = data.results || [];
+    if (!rs.length){ toast("inbox 目录里没有表格文件"); return; }
+    const ok = rs.filter(r => r.ok && !r.skipped).reduce((s, r) => s + (r.inserted || 0), 0);
+    const skip = rs.filter(r => r.skipped).length;
+    toast(`导入完成：新增 ${ok} 条，跳过 ${skip} 份已导入文件`);
+    refresh();
+  }catch(err){ toast(err.message); }
+}
+
+async function retryJob(id){
+  try{
+    await api(`/api/jobs/${id}/retry`, {method:"POST", body:"{}"});
+    toast(`#${id} 已重新排队`);
+    refresh();
+  }catch(err){ toast(err.message); }
+}
+
+refresh();
+loadDaily(7);
+loadSettings();
+// 支持 http://127.0.0.1:8766/?settings=1 直接打开设置中心（排障/截图方便）
+if (location.search.includes("settings=1")) setTimeout(openSettings, 300);
+setInterval(refresh, 3000);
+setInterval(() => loadDaily(DAYS), 60000);
+
+// 顶部品牌行常驻，滚动时才加分隔线，静止时不显得多余
+addEventListener("scroll", () => {
+  const b = document.querySelector(".brand");
+  if (b) b.classList.toggle("stuck", window.scrollY > 4);
+}, {passive: true});
+
+</script>
+
+<footer>
+  <div class="brandline">
+    <img src="/static/miao-badge.png" alt="">
+    <span>杭州喵喵至家网络有限公司</span>
+    <span>·</span>
+    <a href="https://www.hbdxm.com" target="_blank">www.hbdxm.com</a>
+    <span>·</span>
+    <span>专注行业软件开发</span>
+    <span>·</span>
+    <span>让上班有更多时间摸鱼</span>
+  </div>
+  <span class="ver">v1.0</span>
+</footer>
+</div>
+</body>
+</html>

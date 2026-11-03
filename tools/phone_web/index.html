@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>运单助手 · 手机端安装</title>
+<style>
+  :root{--bg:#f6f7f9;--card:#fff;--ink:#16181d;--sub:#6b7280;--line:#e6e8ec;--brand:#0b6cff;--ok:#0a8f3c}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 14px 40px}
+  h1{font-size:21px;margin:6px 0 2px}
+  .sub{color:var(--sub);font-size:13px;margin-bottom:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+  .step{display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--brand);color:#fff;font-size:14px;align-items:center;justify-content:center;margin-right:8px;vertical-align:-3px}
+  .t{font-weight:600;font-size:16px;margin-bottom:6px}
+  .hint{color:var(--sub);font-size:13px}
+  .btn{display:block;text-align:center;background:var(--brand);color:#fff;text-decoration:none;border:0;border-radius:12px;padding:14px;font-size:17px;font-weight:600;margin-top:10px;width:100%}
+  .btn.ghost{background:#eef3ff;color:var(--brand)}
+  .btn.gray{background:#eceef2;color:#333}
+  textarea{width:100%;height:150px;border:1px solid var(--line);border-radius:10px;padding:10px;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;background:#fafbfc;margin-top:8px}
+  .ok{color:var(--ok);font-weight:600}
+  code{background:#f0f2f5;padding:1px 6px;border-radius:5px;font-size:13px}
+  ol{padding-left:20px;margin:8px 0}
+  li{margin:4px 0}
+</style>
+<h1>运单揽件助手 · 手机端</h1>
+<div class="sub">让手机自己把单号灌进申行者，不用手点</div>
+
+<div class="card">
+  <div class="t"><span class="step">1</span>装 AutoJs6</div>
+  <div class="hint">点下面的按钮下载，装完打开一次，按提示开「无障碍服务」（设置 → 无障碍 → 已下载的服务 → AutoJs6 打开）。</div>
+  <a class="btn" href="/apk/autojs6.apk">下载 AutoJs6 安装包</a>
+</div>
+
+<div class="card">
+  <div class="t"><span class="step">2</span>复制探针脚本</div>
+  <div class="hint">先让申行者停在「揽件扫描」页，然后在 AutoJs6 里新建脚本 → 粘贴 → 运行。它会把这一页的控件信息传回电脑，用来配好后续的点按钮动作。</div>
+  <button class="btn ghost" onclick="loadScript('autojs_probe.js','probe')">复制探针脚本</button>
+  <textarea id="probe" placeholder="点上面的按钮后，脚本会出现在这里"></textarea>
+</div>
+
+<div class="card">
+  <div class="t"><span class="step">3</span>复制正式脚本</div>
+  <div class="hint">探针跑通后，新建一个脚本，粘贴这个，运行。之后电脑一发批，手机就自己粘贴、点确定、回传结果。</div>
+  <button class="btn ghost" onclick="loadScript('autojs_main.js','main')">复制正式脚本</button>
+  <textarea id="main" placeholder="点上面的按钮后，脚本会出现在这里"></textarea>
+</div>
+
+<div class="card">
+  <div class="t">跑之前注意</div>
+  <ol>
+    <li>手机停在<b>申行者 → 揽件扫描</b>页，别锁屏</li>
+    <li>AutoJs6 需要「无障碍」+「后台弹窗/悬浮窗」权限，否则会被系统杀掉</li>
+    <li>脚本每 3 秒问一次电脑有没有新批次，有就自动干</li>
+    <li>界面改了导致认不出按钮，脚本会把当前界面传回电脑，我再调</li>
+  </ol>
+</div>
+
+<script>
+function copyText(t){
+  var ta=document.createElement('textarea');
+  ta.value=t; ta.style.position='fixed'; ta.style.opacity=0;
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  var ok=false;
+  try{ ok=document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta);
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(t).catch(function(){}); }
+  alert(ok||navigator.clipboard ? '已复制，去 AutoJs6 新建脚本粘贴' : '复制失败，请长按下面文本框手动复制');
+}
+function loadScript(file,id){
+  fetch('/'+file).then(function(r){return r.text()}).then(function(t){
+    var el=document.getElementById(id);
+    el.value=t;
+    copyText(t);
+  }).catch(function(){
+    fetch('/'+file).then(function(r){return r.text()}).then(function(t){
+      document.getElementById(id).value=t;
+      alert('脚本已加载，请长按文本框手动复制');
+    });
+  });
+}
+</script>
+</html>
