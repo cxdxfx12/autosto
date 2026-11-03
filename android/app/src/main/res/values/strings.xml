@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">运单揽收</string>
+    <string name="acc_desc">运单自动揽收：自动打开申行者、粘贴单号、点确定/完成/上传并回写结果。需在设置中开启本服务。</string>
+
+    <string name="hint_pc_base">电脑局域网地址 http://IP:8766</string>
+    <string name="hint_token">server.token</string>
+    <string name="hint_peer_host">转发桥网关 IP（同电脑）</string>
+    <string name="hint_peer_token">转发桥 token（无则留空）</string>
+</resources>
