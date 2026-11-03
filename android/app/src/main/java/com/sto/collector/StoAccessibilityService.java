@@ -201,7 +201,7 @@ public class StoAccessibilityService extends AccessibilityService {
 
     private void wake() {
         try {
-            performGlobalAction(GLOBAL_ACTION_TURN_SCREEN_ON);
+            performGlobalAction(AccessibilityService.GLOBAL_ACTION_TURN_SCREEN_ON);
         } catch (Exception ignored) {
         }
         try {
