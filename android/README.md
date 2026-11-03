@@ -102,7 +102,7 @@ android/
 
 - **设备校准**：`StoAccessibilityService` 里的节点定位（输入框 className、`^确定$`、`^完成$`、`tvUpload`、`粘贴`、弹窗词）是按 PC 端逻辑移植的，不同申行者版本/机型可能需要微调。安装后若揽收不动，先用 AutoX 的 `probe.js` 思路 dump 控件树核对，或直接 logcat 看 `StoCollector` 标签的日志。
 - **AccessibilityNodeInfo 回收**：为简化，部分搜索路径未严格回收中间节点，长期运行有轻微泄漏风险；正式上线前建议按 Android 规范补 `recycle()`。
-- **编译验证**：源码已通过 GitHub Actions 云端构建验证（见上文「方法一：一键云端构建」）；若你在本地构建报小错，多半是 SDK 版本/依赖下载问题，按 Android Studio 提示处理即可。
+- **编译验证**：源码可由 GitHub Actions 云端构建验证（见上文「方法一」自动出包，首次运行约 3~6 分钟）；若你本地用 Android Studio 构建报小错，多半是 SDK 版本/依赖下载问题，按提示处理即可。
 
 ## 故障排查
 
