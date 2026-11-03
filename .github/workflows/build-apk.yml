@@ -21,16 +21,18 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept licenses & install SDK packages
+      - name: Install Android SDK (cmdline-tools + platform 33 + build-tools 33.0.1)
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-33" "build-tools;33.0.1"
-
-      - name: Point Gradle to Android SDK
-        run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+          SDK_ROOT=$HOME/android-sdk
+          mkdir -p "$SDK_ROOT/cmdline-tools"
+          curl -fsSL -o /tmp/cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q /tmp/cmdline-tools.zip -d "$SDK_ROOT/cmdline-tools"
+          mv "$SDK_ROOT/cmdline-tools/cmdline-tools" "$SDK_ROOT/cmdline-tools/latest"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "$SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.1"
+          echo "sdk.dir=$SDK_ROOT" > android/local.properties
 
       - name: Build debug APK (Gradle 8.4)
         uses: gradle/gradle-build-action@v3
